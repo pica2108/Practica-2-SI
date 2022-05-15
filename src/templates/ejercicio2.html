@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Práctica 2</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"
+            integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg=="
+            crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/3.0.4/socket.io.js"
+            integrity="sha512-aMGMvNYu8Ue4G+fHa359jcPb1u+ytAF+P2SCb+PxrjCdO3n3ZTxJ30zuH39rimUggmTwmh2u7wvQsDTHESnmfQ=="
+            crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style type="text/css">
+        body {
+            background-color: #1a1a1a;
+            color: #d1d1d1;
+            font-family: 'Roboto', sans-serif;
+        }
+
+        .control-panel {
+            padding: 10px 20px;
+            background-color: #666666;
+            border-radius: 4px;
+        }
+
+        .control-panel div {
+            padding-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+
+        .control-panel div input {
+            width: 40px;
+            margin-right: 15px;
+            margin-left: 5px;
+        }
+
+        .container {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .table {
+            flex: 1;
+            padding: 20px;
+        }
+
+        .table-title {
+            font-weight: bold;
+            background-color: #666666;
+            height: 25px;
+            font-size: 15px;
+            padding: 10px 15px;
+            display: flex;
+            align-items: center;
+            border-radius: 4px;
+            margin-bottom: 5px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .table-items {
+            max-height: 300px;
+            overflow: auto;
+        }
+
+        .table-item {
+            height: 20px;
+            font-size: 14px;
+            padding: 15px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .hover-item:hover {
+            background-color: #727272;
+            cursor: pointer;
+        }
+
+        .per-bar {
+            position: relative;
+            width: 50%;
+            border-radius: 4px;
+            border: 1px solid lightgray;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: lightgray;
+            background-color: #525252;
+        }
+
+        .per-bar-color {
+            position: absolute;
+            left: 0;
+            top: 0;
+            background-color: #ff4343;
+            opacity: 0.8;
+            height: 100%;
+            border-radius: 4px 0 0 4px;
+        }
+
+        .per-bar span {
+            font-weight: bold;
+            font-size: 12px;
+            z-index: 1;
+        }
+
+        .modal-container {
+            position: absolute;
+            top: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #modal {
+            position: relative;
+            width: 70%;
+            margin: auto;
+            top: 150px;
+            background-color: #666666;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 1;
+        }
+
+        #modal span {
+            margin: 10px 0;
+        }
+
+        #modal-overlay {
+            position: absolute;
+            height: 100%;
+            width: 100%;
+            background-color: black;
+            opacity: 0.6;
+            top: 0;
+        }
+
+        .chart-container {
+            height: 400px;
+            width: 400px;
+            display: flex;
+        }
+    </style>
+</head>
+<body {%if username_info %} style="overflow: hidden" {% endif %}>
+<div>
+    {% for conex in conexiones %}
+    <div class="conex-data" data-conexion="{{conex}}"></div>
+    {% endfor %}
+</div>
+
+<form method="post" class="control-panel">
+    <div>
+        <label for="top_user">Top usuarios críticos</label>
+        <input type="number" name="top_user" id="top_user" min="0" value="{{usuarios|length}}"></input>
+        <label for="min_criticidad">Filtrar por >50%</label>
+        <input type="checkbox" value="50" name="min_criticidad" id="min_criticidad" {%if min_criticidad_usuarios %}
+               checked {% endif %}>
+        <label for="max_criticidad">Filtrar por <50%</label>
+        <input type="checkbox" value="50" name="max_criticidad" id="max_criticidad" {%if max_criticidad_usuarios %}
+               checked {% endif %}>
+    </div>
+    <div>
+        <label for="top_webs">Top webs vulnerables</label>
+        <input type="number" name="top_webs" id="top_webs" min="0" value="{{webs|length}}"></input>
+    </div>
+
+    <input type="text" value="" name="username" id="username" hidden></input>
+    <button type="submit">Buscar</button>
+</form>
+
+<div class="container">
+    <div class="table">
+        <div class="table-title">
+            Top {{usuarios|length}} usuarios críticos
+        </div>
+        <div class="table-items">
+            {% for user in usuarios %}
+            <div class="table-item hover-item" onclick=onClickUsername('{{user[0]}}')>
+                <span>{{loop.index}}º</span>
+                <div class="username">{{user[0]}}</div>
+                <div class="per-bar">
+                    <span>{{user[3]}}%</span>
+                    <div style="width: {{user[3]}}%" class="per-bar-color"></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="table">
+        <div class="table-title">
+            Top {{webs|length}} webs vulnerables
+        </div>
+        <div class="table-items">
+            {% for web in webs %}
+            <div class="table-item">
+                <span>{{loop.index}}º</span>
+                <div class="web">{{web[0]}}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="table">
+        <div class="table-title">
+            Top 10 vulnerabilidades <span id="last-vuln-update">loading...</span>
+        </div>
+        <div class="table-items" id="vulnerabilities-list"></div>
+    </div>
+</div>
+<div class="chart-container">
+    <canvas id="myChart" height=400 width=400 style="height: 400px; width: 400px"></canvas>
+</div>
+{% if username_info %}
+<div class="modal-container">
+    <div id="modal">
+        <span><strong>Telefono</strong>: {{username_info[0][0]}}</span>
+        <span><strong>Hash de la contraseña</strong>: {{username_info[1][0]}}</span>
+        <span><strong>Provincia</strong>: {{username_info[2][0]}}</span>
+        <span><strong>Permiso</strong>:{% if username_info[3][0] == '1' %} Administrador {% elif username_info[3][0] == '0' %} Usuario {% endif %}</span>
+        <span><strong>Emails totales</strong>: {{username_info[6][0]}}</span>
+        <span><strong>Emails spam</strong>: {{username_info[7][0]}}</span>
+        <span><strong>Emails clicados</strong>: {{username_info[8][0]}}</span>
+    </div>
+</div>
+<div id="modal-overlay" onclick="onClickOverlay()"/>
+{% endif %}
+
+<script>
+    const onClickUsername = (target) => {
+        document.getElementById('username').value = target;
+        document.querySelector('form').submit()
+    }
+    const onClickOverlay = (target) => {
+        document.getElementById('username').value = '';
+        document.querySelector('form').submit()
+    }
+    const openVuln = (vulnId) => {
+        window.open(`https://cve.mitre.org/cgi-bin/cvename.cgi?name=${vulnId}`, '_blank').focus()
+    }
+    $(document).ready(function () {
+        const socket = io();
+
+        socket.on('vulnerabilidades-socket-event', (data) => {
+            document.getElementById('vulnerabilities-list').innerHTML = '';
+            data.forEach((vuln, index) => {
+                const htmlNode = `<div class="table-item hover-item" onclick=openVuln("${vuln.id}")><span>${index + 1}º</span><div>${vuln.id}</div></div>`
+                const node = document.createRange().createContextualFragment(htmlNode);
+                document.getElementById('vulnerabilities-list').append(node)
+            })
+            document.getElementById('last-vuln-update').innerText = `Last update: ${new Date().getHours()}:${new Date().getMinutes()}:${new Date().getSeconds()}`
+        })
+    })
+</script>
+<script>
+    const conexiones = [].map.call(document.getElementsByClassName("conex-data"), item => item.dataset.conexion.replace("[", '').replace("]", '').split(' '))
+    const conexiones_mes = []
+
+    const labels = [
+        'Enero',
+        'Febrero',
+        'Marzo',
+        'Abril',
+        'Mayo',
+        'Junio',
+        'Julio',
+        'Agosto',
+        'Septiembre',
+        'Octubre',
+        'Noviembre',
+        'Diciembre',
+    ];
+    labels.forEach((_, index) => {
+        const mes = conexiones.filter(con => con[1] === `${index + 1}.0`)
+
+        conexiones_mes.push(mes.length)
+    })
+    console.log(conexiones_mes)
+
+    const data = {
+        labels: labels,
+        datasets: [{
+            label: 'Conexiones al mes',
+            backgroundColor: 'rgb(0,101,255)',
+            borderColor: 'rgb(0,101,255)',
+            data: conexiones_mes,
+        }]
+    };
+
+    const config = {
+        type: 'line',
+        data: data,
+        options: {}
+    };
+</script>
+<script>
+    const myChart = new Chart(
+        document.getElementById('myChart'),
+        config
+    );
+</script>
+
+</body>
+</html>
